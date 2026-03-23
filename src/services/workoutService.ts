@@ -29,6 +29,30 @@ export const workoutService = {
     }
   },
 
+  async updateEjercicio(id: string, ejercicio: Partial<Omit<Ejercicio, 'id'>>): Promise<void> {
+    try {
+      const docRef = doc(db, EJERCICIOS_COL, id);
+      await updateDoc(docRef, ejercicio);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, EJERCICIOS_COL);
+    }
+  },
+
+  async deleteEjercicio(id: string): Promise<void> {
+    try {
+      // Also delete from routine associations
+      const q = query(collection(db, RUTINA_EJERCICIOS_COL), where('ejercicioId', '==', id));
+      const snapshot = await getDocs(q);
+      const deletePromises = snapshot.docs.map(d => deleteDoc(doc(db, RUTINA_EJERCICIOS_COL, d.id)));
+      await Promise.all(deletePromises);
+      
+      // Delete exercise
+      await deleteDoc(doc(db, EJERCICIOS_COL, id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, EJERCICIOS_COL);
+    }
+  },
+
   // Rutinas
   async getRutinas(): Promise<Rutina[]> {
     try {
@@ -70,6 +94,73 @@ export const workoutService = {
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, RUTINA_EJERCICIOS_COL);
       return '';
+    }
+  },
+
+  async updateRutina(id: string, rutina: Partial<Rutina>): Promise<void> {
+    try {
+      const docRef = doc(db, RUTINAS_COL, id);
+      await updateDoc(docRef, rutina);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, RUTINAS_COL);
+    }
+  },
+
+  async deleteRutina(id: string): Promise<void> {
+    try {
+      console.log('Deleting routine:', id);
+      // Delete routine exercises first
+      const q = query(collection(db, RUTINA_EJERCICIOS_COL), where('rutinaId', '==', id));
+      const snapshot = await getDocs(q);
+      console.log(`Found ${snapshot.docs.length} exercise associations to delete`);
+      const deletePromises = snapshot.docs.map(d => deleteDoc(doc(db, RUTINA_EJERCICIOS_COL, d.id)));
+      await Promise.all(deletePromises);
+      
+      // Delete routine
+      await deleteDoc(doc(db, RUTINAS_COL, id));
+      console.log('Routine deleted successfully');
+    } catch (error) {
+      console.error('Error deleting routine:', error);
+      handleFirestoreError(error, OperationType.DELETE, RUTINAS_COL);
+    }
+  },
+
+  async getHistorialCompleto(userId: string): Promise<HistorialSerie[]> {
+    try {
+      const q = query(
+        collection(db, HISTORIAL_SERIES_COL),
+        where('userId', '==', userId),
+        orderBy('fecha', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as HistorialSerie));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, HISTORIAL_SERIES_COL);
+      return [];
+    }
+  },
+
+  async syncRutinaEjercicios(rutinaId: string, ejercicioIds: string[]): Promise<void> {
+    try {
+      // 1. Get existing
+      const q = query(collection(db, RUTINA_EJERCICIOS_COL), where('rutinaId', '==', rutinaId));
+      const snapshot = await getDocs(q);
+      
+      // 2. Delete all existing for this routine to simplify sync
+      const deletePromises = snapshot.docs.map(d => deleteDoc(doc(db, RUTINA_EJERCICIOS_COL, d.id)));
+      await Promise.all(deletePromises);
+      
+      // 3. Add new ones
+      for (let i = 0; i < ejercicioIds.length; i++) {
+        await this.addRutinaEjercicio({
+          rutinaId,
+          ejercicioId: ejercicioIds[i],
+          orden: i + 1,
+          seriesObjetivo: 3
+        });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, RUTINA_EJERCICIOS_COL);
     }
   },
 

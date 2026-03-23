@@ -116,12 +116,14 @@ service cloud.firestore {
 
     match /ejercicios/{ejercicioId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin() && isValidEjercicio(request.resource.data);
+      allow create, update: if isAdmin() && isValidEjercicio(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /rutinas/{rutinaId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin() && isValidRutina(request.resource.data);
+      allow create, update: if isAdmin() && isValidRutina(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /rutina_ejercicios/{relId} {
