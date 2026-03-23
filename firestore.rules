@@ -1,0 +1,152 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /ejercicios/{ejercicioId}
+    // Fields:
+    //   - nombre: string (required)
+    //   - musculo: string (required)
+    //   - descripcion: string (optional)
+    //
+    // Collection: /rutinas/{rutinaId}
+    // Fields:
+    //   - nombre: string (required)
+    //   - descripcion: string (optional)
+    //   - duracionEstimada: number (optional)
+    //   - color: string (optional)
+    //
+    // Collection: /rutina_ejercicios/{relId}
+    // Fields:
+    //   - rutinaId: string (required)
+    //   - ejercicioId: string (required)
+    //   - orden: number (required)
+    //   - seriesObjetivo: number (optional)
+    //
+    // Collection: /historial_series/{serieId}
+    // Fields:
+    //   - userId: string (required, immutable)
+    //   - ejercicioId: string (required)
+    //   - rutinaId: string (optional)
+    //   - fecha: string (required, format YYYY-MM-DD)
+    //   - peso: number (required)
+    //   - reps: number (required)
+    //   - serieIndex: number (required)
+    //   - timestamp: timestamp (required)
+    //
+    // Collection: /usuarios/{userId}
+    // Fields:
+    //   - email: string (required)
+    //   - role: string (required, enum: ['admin', 'user'])
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "framirez7@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidEjercicio(data) {
+      return hasRequiredFields(['nombre', 'musculo']) &&
+             data.nombre is string && data.nombre.size() > 0 && data.nombre.size() < 100 &&
+             data.musculo is string && data.musculo.size() > 0 && data.musculo.size() < 50;
+    }
+
+    function isValidRutina(data) {
+      return hasRequiredFields(['nombre']) &&
+             data.nombre is string && data.nombre.size() > 0 && data.nombre.size() < 100;
+    }
+
+    function isValidHistorialSerie(data) {
+      return hasRequiredFields(['userId', 'ejercicioId', 'fecha', 'peso', 'reps', 'serieIndex', 'timestamp']) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.ejercicioId is string &&
+             isValidDateString(data.fecha) &&
+             data.peso is number && data.peso >= 0 &&
+             data.reps is number && data.reps >= 0 &&
+             data.serieIndex is number && data.serieIndex >= 0 &&
+             data.timestamp is timestamp;
+    }
+
+    function isValidUsuario(data) {
+      return hasRequiredFields(['email', 'role']) &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'user'];
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    match /ejercicios/{ejercicioId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin() && isValidEjercicio(request.resource.data);
+    }
+
+    match /rutinas/{rutinaId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin() && isValidRutina(request.resource.data);
+    }
+
+    match /rutina_ejercicios/{relId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /historial_series/{serieId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidHistorialSerie(request.resource.data);
+      allow update: if isAuthenticated() && isValidHistorialSerie(request.resource.data) && 
+                      resource.data.userId == request.auth.uid && 
+                      request.resource.data.userId == resource.data.userId;
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /usuarios/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUsuario(request.resource.data) && request.resource.data.role == 'user';
+      allow update: if isAdmin() && isValidUsuario(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}

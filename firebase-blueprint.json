@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "ejercicio": {
+      "title": "Ejercicio",
+      "description": "Definición de un ejercicio de entrenamiento",
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string", "description": "Nombre del ejercicio" },
+        "musculo": { "type": "string", "description": "Grupo muscular principal" },
+        "descripcion": { "type": "string", "description": "Descripción breve" }
+      },
+      "required": ["nombre", "musculo"]
+    },
+    "rutina": {
+      "title": "Rutina",
+      "description": "Una rutina de entrenamiento compuesta por ejercicios",
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string", "description": "Nombre de la rutina" },
+        "descripcion": { "type": "string", "description": "Descripción de la rutina" },
+        "duracionEstimada": { "type": "number", "description": "Duración estimada en minutos" },
+        "color": { "type": "string", "description": "Color representativo" }
+      },
+      "required": ["nombre"]
+    },
+    "rutina_ejercicio": {
+      "title": "Rutina Ejercicio",
+      "description": "Relación entre una rutina y un ejercicio",
+      "type": "object",
+      "properties": {
+        "rutinaId": { "type": "string", "description": "ID de la rutina" },
+        "ejercicioId": { "type": "string", "description": "ID del ejercicio" },
+        "orden": { "type": "number", "description": "Orden del ejercicio en la rutina" },
+        "seriesObjetivo": { "type": "number", "description": "Número de series objetivo" }
+      },
+      "required": ["rutinaId", "ejercicioId", "orden"]
+    },
+    "historial_serie": {
+      "title": "Historial Serie",
+      "description": "Registro de una serie completada",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "ID del usuario" },
+        "ejercicioId": { "type": "string", "description": "ID del ejercicio" },
+        "rutinaId": { "type": "string", "description": "ID de la rutina (opcional)" },
+        "fecha": { "type": "string", "format": "date", "description": "Fecha del entrenamiento (YYYY-MM-DD)" },
+        "peso": { "type": "number", "description": "Peso levantado" },
+        "reps": { "type": "number", "description": "Repeticiones realizadas" },
+        "serieIndex": { "type": "number", "description": "Índice de la serie (0, 1, 2...)" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Momento exacto del guardado" }
+      },
+      "required": ["userId", "ejercicioId", "fecha", "peso", "reps", "serieIndex", "timestamp"]
+    },
+    "usuario": {
+      "title": "Usuario",
+      "description": "Perfil de usuario",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "user"] }
+      },
+      "required": ["email"]
+    }
+  },
+  "firestore": {
+    "/ejercicios/{ejercicioId}": {
+      "schema": "ejercicio",
+      "description": "Catálogo de ejercicios"
+    },
+    "/rutinas/{rutinaId}": {
+      "schema": "rutina",
+      "description": "Rutinas creadas"
+    },
+    "/rutina_ejercicios/{relId}": {
+      "schema": "rutina_ejercicio",
+      "description": "Ejercicios asignados a rutinas"
+    },
+    "/historial_series/{serieId}": {
+      "schema": "historial_serie",
+      "description": "Historial de series completadas"
+    },
+    "/usuarios/{userId}": {
+      "schema": "usuario",
+      "description": "Datos de usuario"
+    }
+  }
+}
